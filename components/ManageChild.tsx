@@ -14,6 +14,10 @@ export default function ManageChild({ studentId, familyId, subjects, lessons, ho
   const setStatus = async (table: string, id: string, status: string) =>
     done((await sb.from(table).update({ status, completed_at: status === 'done' ? new Date().toISOString() : null }).eq('id', id)).error)
   const subName = (id: string) => subjects.find(s => s.id === id)?.name ?? '—'
+  const viewPhoto = async (path: string) => {
+    const { data, error } = await sb.storage.from('homework-photos').createSignedUrl(path, 300)
+    if (error || !data) setErr('تعذر فتح الصورة'); else window.open(data.signedUrl, '_blank')
+  }
   const submit = (fn: (f: FormData) => Promise<void>) => (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const form = e.currentTarget; const f = new FormData(form); fn(f).then(() => form.reset())
   }
@@ -58,7 +62,7 @@ export default function ManageChild({ studentId, familyId, subjects, lessons, ho
         </form>
         <ul>{homework.map(h => <li key={h.id} className="flex items-center justify-between gap-2 border-t py-1 dark:border-slate-700">
           <span>{h.title} ({subName(h.subject_id)}) — {h.due_date} {h.status !== 'done' && h.due_date < new Date().toISOString().slice(0, 10) && <b className="text-red-600">متأخر</b>} — {statusAr[h.status]}</span>
-          <span className="flex gap-2"><button className="text-blue-600" onClick={() => setStatus('homework', h.id, h.status === 'done' ? 'pending' : 'done')}>{h.status === 'done' ? 'إلغاء' : 'تم'}</button><Del t="homework" id={h.id} /></span></li>)}</ul>
+          <span className="flex gap-2">{h.photo_path && <button className="text-purple-600" onClick={() => viewPhoto(h.photo_path)}>📷 عرض الصورة</button>}<button className="text-blue-600" onClick={() => setStatus('homework', h.id, h.status === 'done' ? 'pending' : 'done')}>{h.status === 'done' ? 'إلغاء' : 'تم'}</button><Del t="homework" id={h.id} /></span></li>)}</ul>
       </section>
 
       <section className="card space-y-2">
