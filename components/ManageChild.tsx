@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase/client'
 type Row = Record<string, any>
 type Props = { studentId: string; familyId: string; subjects: Row[]; lessons: Row[]; homework: Row[]; exams: Row[]; grades: Row[] }
 const statusAr: Record<string, string> = { pending: 'لم يبدأ', in_progress: 'جارٍ', done: 'تم', missed: 'فائت' }
+const RV: Record<string, string> = { pending: '⏳ بانتظار المراجعة', approved: '✅ موافق عليه', rejected: '↩ أُعيد' }
 
 export default function ManageChild({ studentId, familyId, subjects, lessons, homework, exams, grades }: Props) {
   const router = useRouter(); const sb = supabaseBrowser(); const [err, setErr] = useState('')
@@ -17,6 +18,12 @@ export default function ManageChild({ studentId, familyId, subjects, lessons, ho
   const viewPhoto = async (path: string) => {
     const { data, error } = await sb.storage.from('homework-photos').createSignedUrl(path, 300)
     if (error || !data) setErr('تعذر فتح الصورة'); else window.open(data.signedUrl, '_blank')
+  }
+  const review = async (id: string, status: 'approved' | 'rejected') => {
+    const note = status === 'rejected' ? prompt('سبب الإعادة (اختياري)') : null
+    if (status === 'rejected' && note === null) return
+    const patch = status === 'approved' ? { review_status: status } : { review_status: status, review_note: note || null, status: 'pending', completed_at: null }
+    done((await sb.from('homework').update(patch).eq('id', id)).error)
   }
   const submit = (fn: (f: FormData) => Promise<void>) => (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const form = e.currentTarget; const f = new FormData(form); fn(f).then(() => form.reset())
@@ -61,8 +68,8 @@ export default function ManageChild({ studentId, familyId, subjects, lessons, ho
           <button className="btn">إضافة واجب</button>
         </form>
         <ul>{homework.map(h => <li key={h.id} className="flex items-center justify-between gap-2 border-t py-1 dark:border-slate-700">
-          <span>{h.title} ({subName(h.subject_id)}) — {h.due_date} {h.status !== 'done' && h.due_date < new Date().toISOString().slice(0, 10) && <b className="text-red-600">متأخر</b>} — {statusAr[h.status]}</span>
-          <span className="flex gap-2">{h.photo_path && <button className="text-purple-600" onClick={() => viewPhoto(h.photo_path)}>📷 عرض الصورة</button>}<button className="text-blue-600" onClick={() => setStatus('homework', h.id, h.status === 'done' ? 'pending' : 'done')}>{h.status === 'done' ? 'إلغاء' : 'تم'}</button><Del t="homework" id={h.id} /></span></li>)}</ul>
+          <span>{h.kind === 'project' && '🎨 '}{h.title} ({subName(h.subject_id)}) — {h.due_date} {h.status !== 'done' && h.due_date < new Date().toISOString().slice(0, 10) && <b className="text-red-600">متأخر</b>} — {statusAr[h.status]}{h.review_status && ' — ' + RV[h.review_status]}{h.review_note && ` (${h.review_note})`}</span>
+          <span className="flex gap-2">{h.photo_path && <button className="text-purple-600" onClick={() => viewPhoto(h.photo_path)}>📷 عرض الصورة</button>}{h.photo_path && h.review_status === 'pending' && <><button className="text-green-600" onClick={() => review(h.id, 'approved')}>✔ موافقة</button><button className="text-orange-600" onClick={() => review(h.id, 'rejected')}>↩ إعادة</button></>}<button className="text-blue-600" onClick={() => setStatus('homework', h.id, h.status === 'done' ? 'pending' : 'done')}>{h.status === 'done' ? 'إلغاء' : 'تم'}</button><Del t="homework" id={h.id} /></span></li>)}</ul>
       </section>
 
       <section className="card space-y-2">
