@@ -1,0 +1,14 @@
+// Minimal service worker: enables installability + offline fallback page.
+// It never caches pages or API responses (they contain private student data).
+const CACHE = 'edu-shell-v1'
+const OFFLINE = '/offline.html'
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(OFFLINE))); self.skipWaiting() })
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))))
+  self.clients.claim()
+})
+self.addEventListener('fetch', e => {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).catch(() => caches.match(OFFLINE)))
+  }
+})
